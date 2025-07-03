@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lieferschein Scanner</title>
+<style>
+ body { font-family: Arial, sans-serif; padding: 1rem; max-width: 480px; margin: auto; }
+ button { margin: 0.5rem 0; padding: 0.7rem; width: 100%; font-size: 1rem; }
+ input, textarea { width: 100%; padding: 0.5rem; font-size: 1rem; margin: 0.5rem 0; }
+ ul { padding-left: 1.2rem; }
+ li { margin: 0.3rem 0; }
+ .notification { background: #ffdddd; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid #ff5555; }
+</style>
+</head>
+<body>
+<h1>Lieferschein Scanner</h1>
+<label for="email">E-Mail Adresse zum Teilen:</label>
+<input type="email" id="email" placeholder="Beispiel: max@beispiel.de" />
+<button id="scanBtn">Barcode scannen</button>
+<button id="shareBtn">Liste per Mail teilen</button>
+<button id="undoBtn">Letzten Scan löschen</button>
+<button id="clearBtn">Alle Scans löschen</button>
+<div id="notification" class="notification" style="display:none;"></div>
+<h2>Gespeicherte Barcodes:</h2>
+<ul id="barcodeList"></ul>
+<!-- Barcode-Scanner Lib -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.18.6/umd/index.min.js"></script>
+<script>
+ const codeReader = new ZXing.BrowserBarcodeReader();
+ const scanBtn = document.getElementById('scanBtn');
+ const shareBtn = document.getElementById('shareBtn');
+ const undoBtn = document.getElementById('undoBtn');
+ const clearBtn = document.getElementById('clearBtn');
+ const notification = document.getElementById('notification');
+ const barcodeListEl = document.getElementById('barcodeList');
+ const emailInput = document.getElementById('email');
+ let barcodes = [];
+ function showNotification(text) {
+   notification.textContent = text;
+   notification.style.display = 'block';
+   setTimeout(() => notification.style.display = 'none', 3000);
+ }
+ function renderList() {
+   barcodeListEl.innerHTML = '';
+   barcodes.forEach((code, i) => {
+     const li = document.createElement('li');
+     li.textContent = code;
+     barcodeListEl.appendChild(li);
+   });
+ }
+ async function scanBarcode() {
+   try {
+     // Zugriff auf Kamera starten (erst Frontkamera, falls nicht, wechselt automatisch)
+     const videoInputDevices = await codeReader.listVideoInputDevices();
+     if (videoInputDevices.length === 0) {
+       showNotification('Keine Kamera gefunden.');
+       return;
+     }
+     const selectedDeviceId = videoInputDevices[0].deviceId;
+     // Scanner starten und einmal scannen
+     const result = await codeReader.decodeOnceFromVideoDevice(selectedDeviceId, undefined);
+     const code = result.text.trim();
+     if (barcodes.includes(code)) {
+       showNotification('Barcode wurde bereits gescannt!');
+     } else {
+       barcodes.push(code);
+       renderList();
+       showNotification('Barcode gespeichert: ' + code);
+     }
+   } catch (err) {
+     console.error(err);
+     showNotification('Scan fehlgeschlagen oder abgebrochen.');
+   }
+ }
+ scanBtn.addEventListener('click', () => {
+   scanBarcode();
+ });
+ shareBtn.addEventListener('click', () => {
+   if (barcodes.length === 0) {
+     showNotification('Keine Barcodes zum Teilen.');
+     return;
+   }
+   const mailto = emailInput.value.trim();
+   if (!mailto) {
+     showNotification('Bitte E-Mail Adresse eingeben.');
+     return;
+   }
+   const body = encodeURIComponent(barcodes.join('\n'));
+   window.location.href = `mailto:${mailto}?subject=Lieferschein Barcodes&body=${body}`;
+ });
+ undoBtn.addEventListener('click', () => {
+   if (barcodes.length === 0) {
+     showNotification('Liste ist leer.');
+     return;
+   }
+   barcodes.pop();
+   renderList();
+   showNotification('Letzter Scan entfernt.');
+ });
+ clearBtn.addEventListener('click', () => {
+   barcodes = [];
+   renderList();
+   showNotification('Alle Barcodes gelöscht.');
+ });
+</script>
+</body>
+</html>
